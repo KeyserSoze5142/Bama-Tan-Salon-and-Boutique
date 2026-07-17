@@ -234,6 +234,8 @@ footer a:hover{color:var(--gold-2)}
 .p-row{margin-top:auto;display:flex;align-items:center;justify-content:space-between;gap:8px}
 .p-price{font-family:var(--serif);font-size:1.2rem;font-weight:700;color:var(--bronze)}
 .p-card .buy{margin-left:0;padding:6px 13px}
+.p-var{width:100%;margin-bottom:10px;padding:8px 10px;border:1px solid var(--line);background:var(--cream);font-family:var(--sans);font-weight:300;font-size:.82rem;border-radius:0;-webkit-appearance:none;background-image:url("data:image/svg+xml;charset=UTF-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%23b8894a'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 10px center}
+.p-var:focus{outline:none;border-color:var(--gold)}
 .p-count{text-align:center;font-size:.78rem;letter-spacing:.18em;text-transform:uppercase;color:#8d8272;margin-bottom:26px}
 @media(max-width:960px){.p-grid{grid-template-columns:repeat(3,1fr)}}
 @media(max-width:720px){.p-grid{grid-template-columns:repeat(2,1fr);gap:12px}.p-body{padding:12px}.p-body h3{font-size:.9rem}}
