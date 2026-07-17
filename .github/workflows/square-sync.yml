@@ -1,0 +1,28 @@
+name: Square Sync
+on:
+  schedule:
+    - cron: '0 9 * * *'   # nightly, ~3-4 AM Central
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install requests
+      - name: Sync catalog from Square
+        env:
+          SQUARE_ACCESS_TOKEN: ${{ secrets.SQUARE_ACCESS_TOKEN }}
+        run: python scripts/sync_square.py
+      - name: Commit and push changes
+        run: |
+          git config user.name "square-sync-bot"
+          git config user.email "actions@github.com"
+          git add -A
+          git diff --staged --quiet || (git commit -m "chore: sync Square catalog" && git push)
