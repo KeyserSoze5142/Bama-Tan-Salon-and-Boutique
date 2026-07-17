@@ -239,3 +239,6 @@ footer a:hover{color:var(--gold-2)}
 .p-count{text-align:center;font-size:.78rem;letter-spacing:.18em;text-transform:uppercase;color:#8d8272;margin-bottom:26px}
 @media(max-width:960px){.p-grid{grid-template-columns:repeat(3,1fr)}}
 @media(max-width:720px){.p-grid{grid-template-columns:repeat(2,1fr);gap:12px}.p-body{padding:12px}.p-body h3{font-size:.9rem}}
+/* mobile menu fix: backdrop-filter on the fixed navbar clips the fixed-position menu overlay */
+body.menu-open nav,body.menu-open nav.scrolled{backdrop-filter:none;-webkit-backdrop-filter:none;background:var(--cream)}
+body.menu-open{overflow:hidden}
