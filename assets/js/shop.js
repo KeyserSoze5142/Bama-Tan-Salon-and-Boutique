@@ -9,28 +9,28 @@
 // ============================================================
 const PAYMENT_LINKS = {
   // ----- Tanning packages & memberships -----
-  "l2-single": "",     // Level 2 — single visit $12
-  "l2-five": "",       // Level 2 — five visits $50
-  "l2-ten": "",        // Level 2 — ten visits $80
-  "l2-150": "",        // Level 2 — 150 minutes $100
-  "l2-300": "",        // Level 2 — 300 minutes $120
-  "l2-month": "",      // Level 2 — one-month unlimited $65
+  "l2-single": "https://square.link/u/In6to0Ng",     // Level 2 — single visit $12
+  "l2-five": "https://square.link/u/Dr8gGTJ7",       // Level 2 — five visits $50
+  "l2-ten": "https://square.link/u/hCkmwbdQ",        // Level 2 — ten visits $80
+  "l2-150": "https://square.link/u/uqCyzJXN",        // Level 2 — 150 minutes $100
+  "l2-300": "https://square.link/u/1LdDG1OW",        // Level 2 — 300 minutes $120
+  "l2-month": "https://square.link/u/Fu8o0QzI",      // Level 2 — one-month unlimited $65
   "l2-club": "",       // Level 2 — Club Tan $55/mo (subscription)
-  "l3-single": "",     // Level 3 — single visit $15
-  "l3-five": "",       // Level 3 — five visits $60
-  "l3-ten": "",        // Level 3 — ten visits $100
-  "l3-150": "",        // Level 3 — 150 minutes $110
-  "l3-300": "",        // Level 3 — 300 minutes $150
-  "l3-month": "",      // Level 3 — one-month unlimited $75
+  "l3-single": "https://square.link/u/LgTPWjcA",     // Level 3 — single visit $15
+  "l3-five": "https://square.link/u/Sg3SuExW",       // Level 3 — five visits $60
+  "l3-ten": "https://square.link/u/Fuhc1wsf",        // Level 3 — ten visits $100
+  "l3-150": "https://square.link/u/2lNAZMA6",        // Level 3 — 150 minutes $110
+  "l3-300": "https://square.link/u/7Nr6LHoS",        // Level 3 — 300 minutes $150
+  "l3-month": "https://square.link/u/Exw0gvbN",      // Level 3 — one-month unlimited $75
   "l3-club": "",       // Level 3 — Club Tan $65/mo (subscription)
-  "rl-single": "",     // Red light — single $12
-  "rl-five": "",       // Red light — five visits $50
-  "rl-ten": "",        // Red light — ten visits $80
-  "rl-month": "",      // Red light — one-month unlimited $75
-  "spray-single": "",  // Spray tan session $30
+  "rl-single": "https://square.link/u/BD9MT9tF",     // Red light — single $12
+  "rl-five": "https://square.link/u/zApZmuzQ",       // Red light — five visits $50
+  "rl-ten": "https://square.link/u/DGSvmgtN",        // Red light — ten visits $80
+  "rl-month": "https://square.link/u/7eM90pqh",      // Red light — one-month unlimited $75
+  "spray-single": "https://square.link/u/tgdQZaPf",  // Spray tan session $30
   "spray-club": "",    // Club Spray $65/mo (subscription)
-  "week-any": "",      // Straight-week tanning $35
-  "family-add": "",    // Add family member to any package $30
+  "week-any": "https://square.link/u/AZzhD8YV",      // Straight-week tanning $35
+  "family-add": "https://square.link/u/f8705LnM",    // Add family member to any package $30
   // ----- Boutique & products (from Square item library) -----
 };
 const NOLINK_MSG='Online checkout for this item is coming soon!\n\nCall (205) 462-2115 or visit us at 2337 University Blvd E to purchase today.';
