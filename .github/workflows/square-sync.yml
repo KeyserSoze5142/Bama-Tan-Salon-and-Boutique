@@ -7,11 +7,18 @@ on:
 permissions:
   contents: write
 
+concurrency:
+  group: square-sync
+  cancel-in-progress: false
+
 jobs:
   sync:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: true
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
@@ -24,5 +31,22 @@ jobs:
         run: |
           git config user.name "square-sync-bot"
           git config user.email "actions@github.com"
+          BRANCH="${GITHUB_REF#refs/heads/}"
           git add -A
-          git diff --staged --quiet || (git commit -m "chore: sync Square catalog" && git push)
+          if git diff --staged --quiet; then
+            echo "No changes to commit"
+            exit 0
+          fi
+          git commit -m "chore: sync Square catalog"
+          for i in 1 2 3; do
+            git fetch origin "$BRANCH"
+            git rebase "origin/$BRANCH" || { git rebase --abort; echo "Rebase conflict — manual fix needed"; exit 1; }
+            if git push origin "HEAD:$BRANCH"; then
+              echo "Pushed on attempt $i"
+              exit 0
+            fi
+            echo "Push rejected, retrying ($i)…"
+            sleep 5
+          done
+          echo "Could not push after 3 attempts"
+          exit 1
