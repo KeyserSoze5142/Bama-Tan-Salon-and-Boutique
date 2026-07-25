@@ -5,29 +5,35 @@ Square -> website catalog sync for Bama Tan Salon & Boutique.
 Runs in GitHub Actions (see .github/workflows/square-sync.yml).
 - Pulls every item, variation, price, category, stock level and product
   photo from the Square Catalog / Inventory APIs.
-- Auto-creates a Square-hosted payment link for any sellable variation
-  that doesn't have one yet (stored in data/payment_links.json so each
-  link is only created once).
 - Rewrites the product grid in shop/index.html (between the
-  CATALOG:START / CATALOG:END markers) and wires the tanning-package
-  Buy buttons in assets/js/shop.js.
+  CATALOG:START / CATALOG:END markers) with cart-ready cards:
+  size dropdowns for multi-size items, the size shown inline for
+  single-size items, and Add to Cart buttons carrying the Square
+  variation IDs the checkout Worker needs.
+- Fills the SERVICE_ITEMS map in assets/js/shop.js so tanning-package
+  buttons are cart-enabled too.
+
+All displayed prices are the Square catalog price multiplied by
+PRICE_ADJ (sales tax + card processing). The Cloudflare Worker applies
+the same percentage as an order service charge, so what customers see
+is what Square charges.
 
 Requires env var SQUARE_ACCESS_TOKEN. Never commit the token.
-Optional: SQUARE_ENV=sandbox to run against a Square sandbox account.
-Optional: --mock <fixtures.json> to test generation without the API.
+Optional: SQUARE_ENV=sandbox. Optional: --mock <fixtures.json>.
 """
-import os, sys, json, re, time, html, hashlib
+import os, sys, json, re, time, html
 
 try:
     import requests
 except ImportError:
     requests = None
 
-REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))  # scripts/ -> repo root
+REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SHOP_HTML = os.path.join(REPO, 'shop', 'index.html')
 SHOP_JS = os.path.join(REPO, 'assets', 'js', 'shop.js')
-LINKS_FILE = os.path.join(REPO, 'data', 'payment_links.json')
 CATALOG_FILE = os.path.join(REPO, 'data', 'catalog.json')
+
+PRICE_ADJ = 1.134  # sales tax + card processing — keep in sync with the Worker's TAX_PERCENT
 
 BASE = 'https://connect.squareupsandbox.com' if os.environ.get('SQUARE_ENV') == 'sandbox' \
        else 'https://connect.squareup.com'
@@ -40,9 +46,9 @@ CAT_MAP = {'Clothes': 'clothes', 'Accessories': 'accessories', 'Jewelry': 'acces
            'Tanning Lotion': 'lotions'}
 CAT_LABEL = {'clothes': 'Clothes', 'accessories': 'Accessories', 'lotions': 'Lotions', 'boutique': 'More'}
 
-# Tanning-package Buy buttons on the shop page -> Square item names.
-# (Club memberships are excluded on purpose: recurring billing should be
-# a Square *subscription* link the owner creates once in the dashboard.)
+# shop-page Buy buttons (data-sku) -> Square item names.
+# Club memberships are intentionally absent: recurring billing uses
+# subscription links pasted into PAYMENT_LINKS in shop.js.
 SERVICE_SKU_TO_ITEM = {
     'l2-single': ('Tanning Packages', 'Level 2 - 1 Visit'),
     'l2-five':   ('Tanning Packages', 'Level 2 - 5 Visits'),
@@ -68,9 +74,11 @@ SERVICE_SKU_TO_ITEM = {
 def esc(s):
     return html.escape(str(s), quote=True)
 
+def cents_adj(cents):
+    return int(round(cents * PRICE_ADJ))
+
 def money(cents):
-    d = cents / 100.0
-    return ('$%g' % d) if d != int(d) or True else ('$%d' % int(d))
+    return '$%.2f' % (cents_adj(cents) / 100.0)
 
 # ---------------------------------------------------------------- API helpers
 def api_get(path, params=None):
@@ -113,28 +121,6 @@ def fetch_inventory(variation_ids):
                                 {'catalog_object_ids': chunk, 'cursor': cursor}) or {}
     return counts
 
-def get_location_id():
-    data = api_get('/v2/locations')
-    for loc in data.get('locations', []):
-        if loc.get('status') == 'ACTIVE':
-            return loc['id']
-    raise SystemExit('No active Square location found')
-
-def ensure_payment_link(links, variation_id, location_id):
-    if links.get(variation_id):
-        return links[variation_id]
-    body = {
-        'idempotency_key': hashlib.sha256(('bamatan-' + variation_id).encode()).hexdigest()[:45],
-        'order': {'location_id': location_id,
-                  'line_items': [{'quantity': '1', 'catalog_object_id': variation_id}]},
-    }
-    data = api_post('/v2/online-checkout/payment-links', body)
-    time.sleep(0.35)  # stay well under rate limits
-    if data and data.get('payment_link', {}).get('url'):
-        links[variation_id] = data['payment_link']['url']
-        return links[variation_id]
-    return ''
-
 # ---------------------------------------------------------------- model
 def build_products(objects, counts):
     images = {o['id']: o['image_data'].get('url', '') for o in objects if o['type'] == 'IMAGE'}
@@ -176,31 +162,35 @@ def build_products(objects, counts):
     return products, services
 
 # ---------------------------------------------------------------- HTML
-def render_cards(products, links):
+def render_cards(products):
     out = []
     for p in products:
         vs = p['variations']
-        prices = sorted({v['price'] for v in vs})
-        price_label = money(prices[0]) if len(prices) == 1 else '%s–%s' % (money(prices[0]), money(prices[-1]))
-        first_link = links.get(vs[0]['id'], '')
+        adj = sorted({cents_adj(v['price']) for v in vs})
+        price_label = ('$%.2f' % (adj[0]/100)) if len(adj) == 1 else ('$%.2f–$%.2f' % (adj[0]/100, adj[-1]/100))
         if p['img']:
             img = '<img src="%s" alt="%s — Bama Tan boutique, Tuscaloosa AL" loading="lazy" decoding="async">' % (esc(p['img']), esc(p['name']))
         else:
             img = '<div class="ph"><span class="mono">%s</span><small>%s</small></div>' % (esc(p['name'][:1].upper()), CAT_LABEL[p['cat']])
-        sel = ''
+        meta, sel = '', ''
         if len(vs) > 1:
-            opts = ''.join('<option value="%s" data-price="%s">%s — %s</option>' %
-                           (esc(links.get(v['id'], '')), money(v['price']), esc(v['name'] or 'Option'), money(v['price']))
-                           for v in vs)
-            sel = '<select class="p-var" aria-label="Choose option">%s</select>' % opts
-        buy = ('<a class="buy" href="%s" target="_blank" rel="noopener">Buy</a>' % esc(first_link)) if first_link \
-              else '<a class="buy" data-nolink href="#" role="button">Buy</a>'
+            opts = ''.join('<option value="%s" data-cents="%d" data-price="%s" data-vname="%s">%s — %s</option>' %
+                           (esc(v['id']), cents_adj(v['price']), money(v['price']), esc(v['name']),
+                            esc(v['name'] or 'Option'), money(v['price'])) for v in vs)
+            sel = '<select class="p-var" aria-label="Choose size or option">%s</select>' % opts
+            buy = '<button type="button" class="buy add-cart" data-name="%s">Add to Cart</button>' % esc(p['name'])
+        else:
+            v = vs[0]
+            if v['name'] and v['name'].lower() not in ('regular', 'one size'):
+                meta = '<p class="p-meta">Size: %s</p>' % esc(v['name'])
+            buy = ('<button type="button" class="buy add-cart" data-vid="%s" data-cents="%d" data-name="%s" data-vname="%s">Add to Cart</button>'
+                   % (esc(v['id']), cents_adj(v['price']), esc(p['name']), esc(v['name'] if v['name'].lower() not in ('regular','one size') else '')))
         out.append('''<div class="p-card" data-cat="%s" data-name="%s">
   <div class="p-img">%s</div>
-  <div class="p-body"><h3>%s</h3>%s
+  <div class="p-body"><h3>%s</h3>%s%s
     <div class="p-row"><span class="p-price">%s</span>%s</div>
   </div>
-</div>''' % (p['cat'], esc(p['name'].lower()), img, esc(p['name']), sel, price_label, buy))
+</div>''' % (p['cat'], esc(p['name'].lower()), img, esc(p['name']), meta, sel, price_label, buy))
     return '\n'.join(out)
 
 def splice_shop(cards_html):
@@ -212,17 +202,23 @@ def splice_shop(cards_html):
         raise SystemExit('CATALOG markers not found in shop/index.html')
     open(SHOP_HTML, 'w').write(new)
 
-def wire_service_links(services, links, location_id, live=True):
-    js = open(SHOP_JS).read()
+def wire_service_items(services):
+    entries = {}
     for sku, (cat, item_name) in SERVICE_SKU_TO_ITEM.items():
         vs = services.get((cat, item_name)) or []
         if not vs:
             print('  ~ service item not found in Square:', item_name)
             continue
-        url = ensure_payment_link(links, vs[0]['id'], location_id) if live else links.get(vs[0]['id'], '')
-        if url:
-            js = re.sub(r'("%s":\s*)"[^"]*"' % re.escape(sku), r'\1"%s"' % url, js)
-    open(SHOP_JS, 'w').write(js)
+        v = vs[0]
+        entries[sku] = {'vid': v['id'], 'cents': cents_adj(v['price']), 'name': item_name}
+    js = open(SHOP_JS).read()
+    blob = json.dumps(entries, indent=0).replace('\n', ' ')
+    new = re.sub(r'const SERVICE_ITEMS = \{.*?\}; /\*SYNC:SERVICE_ITEMS\*/',
+                 'const SERVICE_ITEMS = %s; /*SYNC:SERVICE_ITEMS*/' % blob, js, flags=re.S)
+    if new == js and 'SYNC:SERVICE_ITEMS' not in js:
+        print('  ~ SERVICE_ITEMS marker not found in shop.js', file=sys.stderr)
+    open(SHOP_JS, 'w').write(new)
+    return entries
 
 # ---------------------------------------------------------------- main
 def main():
@@ -234,34 +230,26 @@ def main():
     if not mock and requests is None:
         raise SystemExit('pip install requests')
 
-    os.makedirs(os.path.dirname(LINKS_FILE), exist_ok=True)
-    links = json.load(open(LINKS_FILE)) if os.path.exists(LINKS_FILE) else {}
-
     if mock:
-        objects, counts, location_id = mock['objects'], mock.get('counts', {}), 'MOCK'
+        objects, counts = mock['objects'], mock.get('counts', {})
     else:
         print('Fetching catalog…'); objects = fetch_catalog()
         var_ids = [v['id'] for o in objects if o['type'] == 'ITEM'
                    for v in o.get('item_data', {}).get('variations', [])]
         print('Fetching inventory for %d variations…' % len(var_ids))
         counts = fetch_inventory(var_ids)
-        location_id = get_location_id()
 
     products, services = build_products(objects, counts)
     print('Sellable products:', len(products))
 
-    if not mock:
-        need = [v for p in products for v in p['variations'] if not links.get(v['id'])]
-        print('Creating %d missing payment links…' % len(need))
-        for v in need:
-            ensure_payment_link(links, v['id'], location_id)
-
-    splice_shop(render_cards(products, links))
-    wire_service_links(services, links, None if mock else location_id, live=not mock)
-    json.dump(links, open(LINKS_FILE, 'w'), indent=1)
+    splice_shop(render_cards(products))
+    entries = wire_service_items(services)
+    os.makedirs(os.path.dirname(CATALOG_FILE), exist_ok=True)
     json.dump({'generated': time.strftime('%Y-%m-%d %H:%M UTC', time.gmtime()),
-               'products': len(products)}, open(CATALOG_FILE, 'w'), indent=1)
-    print('Done. Shop page updated.')
+               'products': len(products), 'service_items': len(entries),
+               'price_adjustment': PRICE_ADJ},
+              open(CATALOG_FILE, 'w'), indent=1)
+    print('Done. Shop page updated (prices include the %.1f%% adjustment).' % ((PRICE_ADJ-1)*100))
 
 if __name__ == '__main__':
     main()
