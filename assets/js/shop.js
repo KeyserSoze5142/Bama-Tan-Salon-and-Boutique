@@ -8,7 +8,7 @@
 // 3) SERVICE_ITEMS is filled automatically by scripts/sync_square.py.
 // All prices shown include sales tax & card processing (13.4%).
 // ============================================================
-const WORKER_URL = "bamatan-checkout.cmwebber51492.workers.dev";
+const WORKER_URL = "https://bamatan-checkout.cmwebber51492.workers.dev";
 const SHIPPING_CENTS = 1200; // flat shipping; keep in sync with the Worker
 const PAYMENT_LINKS = {
   "l2-club":   "",  // Level 2 Club Tan $55/mo — subscription link
