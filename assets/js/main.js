@@ -8,7 +8,7 @@ document.querySelectorAll('.reveal').forEach(el=>io?io.observe(el):el.classList.
 const form=document.getElementById('contactForm');
 if(form){
   const params=new URLSearchParams(location.search);
-  const presets={'career':'Career — Hairdresser','tan-career':'Career — Tanning Consultant','private':'Private room pricing & availability'};
+  const presets={'booth':'Salon booth rental','career':'Salon booth rental','tan-career':'Salon booth rental','private':'Private room pricing & availability'};
   const p=params.get('i');
   if(p&&presets[p]){const s=document.getElementById('f-interest');[...s.options].forEach(o=>{if(o.text===presets[p])s.value=o.text;});}
   if(params.get('sent')==='1'){
